@@ -1,411 +1,110 @@
-# 🤖 AI Multi-Agent Review Analysis System
+# LLM 기반 상품 리뷰 분석 Agent
 
-LLM 기반 리뷰 감성 분석 자동화 시스템에  
-Supervisor Orchestration, Critic 검증, Human-in-the-Loop(HITL) 구조를 결합하여  
-AI 분석의 신뢰성과 품질을 강화한 Multi-Agent Workflow 프로젝트입니다.
+화장품 리뷰에서 보습·가격·향·포장에 대한 감성과 원문 근거를 추출하고, 분석 결과 검토와 사람의 수정 과정을 연결한 팀 프로젝트입니다.
 
-사용자가 리뷰 데이터를 입력하면 AI가 리뷰를 분석하고,  
-품질 검증 → 재시도 → Human Review까지 자동 수행합니다.
+- 기간: 2026.05.12–2026.05.14
+- 팀 구성: 8명
+- 김남효 담당: 발표 준비·진행, Multi-Agent 처리 흐름과 HITL·평가 방식 설명
 
----
+## 문제와 목표
 
-# 📌 프로젝트 소개
+하나의 리뷰에 만족과 불만이 섞여 있으면 긍정·부정 한 가지로 분류하기 어렵습니다. 리뷰를 속성별로 나누고, 각각의 판단 근거를 원문과 연결하는 것을 목표로 했습니다. 화장품 리뷰 분석 상황을 가정한 PoC이며 실제 기업의 운영 실적으로 제시하지 않습니다.
 
-기존 감성 분석 시스템은 단순히 결과만 출력하는 경우가 많아  
-LLM의 다음과 같은 문제를 해결하기 어려웠습니다.
-
-- 잘못된 감정 판단
-- 근거 없는 Evidence 생성(Hallucination)
-- JSON 구조 오류
-- 불안정한 출력 형식
-- 애매한 리뷰 분석 실패
-
-본 프로젝트는 이러한 문제를 해결하기 위해  
-생성형 AI 기반 Multi-Agent 시스템을 설계하였습니다.
-
-특히,
-
-- Analyzer Agent
-- Critic Agent
-- Supervisor Agent
-- Human-in-the-Loop(HITL)
-
-구조를 통해  
-AI 자동화와 Human 품질 검수를 함께 수행하도록 구현하였습니다.
-
----
-
-# 🚀 주요 기능
-
-## 1️⃣ 리뷰 감성 분석
-
-- Aspect 기반 리뷰 분석
-- 긍정 / 부정 감정 분류
-- Evidence 추출
-- 구조화된 JSON 생성
-
-### Example
+예를 들어 ‘촉촉하지만 가격이 비싸요’는 보습에 대한 긍정과 가격에 대한 부정으로 나눌 수 있습니다.
 
 ```json
-{
-  "items": [
-    {
-      "aspect": "배송",
-      "label": 0,
-      "evidence": "배송이 느려요"
-    }
-  ]
-}
+{"items":[
+  {"aspect":"보습","label":1,"evidence":"촉촉하지만"},
+  {"aspect":"가격","label":0,"evidence":"가격이 비싸요"}
+]}
 ```
 
----
+## 팀이 구현한 처리 흐름
 
-## 2️⃣ Critic 기반 품질 검증
+1. **Analyzer**: 리뷰에서 속성·감성·근거를 추출합니다.
+2. **Critic**: 분석 결과를 검토하고 적합 또는 수정 필요를 판단합니다.
+3. **Supervisor**: 오류 유형에 따라 수정 지시를 전달하거나 사람 검토로 전환합니다.
+4. **HITL**: 사람이 원문과 결과를 확인하고 항목을 수정·삭제·추가합니다.
+5. **배치·대시보드**: 결과를 CSV에 저장하고 Streamlit에서 속성별 감성 분포와 건별 결과를 확인합니다.
 
-Analyzer 결과를 AI가 다시 검증합니다.
+LangGraph가 상태와 반복 흐름을 관리합니다. Supervisor는 Critic의 오류 사유를 LLM으로 분류하고, 최종 재시도·종료·HITL 분기는 정책 코드로 결정합니다. 재시도 가능한 유형은 `OUTPUT_ERROR`, `SCOPE_ERROR`, `EVIDENCE_ERROR`이며, `QUALITY_ERROR`·`ETC` 또는 재시도 한도 도달 시 사람 검토로 넘어갑니다.
 
-### 검증 항목
+현재 실행 코드에는 객체 형식·허용 속성·중복·감성 값·원문 근거 검사도 포함되어 있습니다. 단건 검토는 콘솔 입력 방식이며, Streamlit은 결과 조회 화면입니다. 저장 구현은 CSV이며 SQLite 운영 기능으로 설명하지 않습니다.
 
-- JSON 구조 오류
-- Aspect 적절성
-- Evidence 실제 존재 여부
-- 감정(Label) 정확성
-- 중복 여부
+## 나의 역할
 
----
+프로젝트 발표를 맡아 기존 리뷰 분석의 한계부터 Agent 처리 흐름, HITL의 필요성, LangSmith 평가와 대시보드까지 이어지도록 발표 내용을 정리했습니다.
 
-## 3️⃣ Reason Code 기반 오류 분류
+각 기능을 따로 나열하기보다 정상 처리, 재시도, 사람 검토로 나뉘는 조건을 중심으로 설명했습니다. 팀원들과 기능별 역할과 State의 데이터 흐름을 확인하며 발표를 준비했고, 분석 결과가 생성된 뒤 검토·저장·조회로 이어지는 과정을 전달했습니다.
 
-Critic Agent는 오류를 유형별로 분류합니다.
+## 팀 결과보고서의 성과
 
-| Reason Code | 설명 |
-|---|---|
-| OUTPUT_ERROR | 출력 구조 오류 |
-| SCOPE_ERROR | 잘못된 Aspect |
-| EVIDENCE_ERROR | Evidence 불일치 |
-| QUALITY_ERROR | 감정 판단 애매 |
-| ETC | 기타 오류 |
-| OK | 정상 |
+| 항목 | Step1 | Step2 | 의미 |
+| --- | ---: | ---: | --- |
+| format 평가 점수 | 0.64 | 1.00 | 50개 샘플의 출력 형식 규칙 충족 여부 |
+| 총 토큰 수 | 93.5K | 65.7K | 보고서에 제시된 두 평가 실행의 사용량 |
 
----
+`format`은 items 목록, 필수 필드, 감성 값, 속성 중복, Critic 판정 형식을 확인하는 지표입니다. 정답 감성과 비교한 분류 정확도가 아닙니다. 토큰 수는 실제 청구 금액이나 서비스 비용 절감률과 구분합니다. [팀 결과보고서 5쪽](https://drive.google.com/file/d/12zsNLxls7zo_7dN0Lh0NKxm_2IxEjCSR/view)
 
-## 4️⃣ Repair Directive 기반 재시도
+Streamlit에서는 리뷰 수, 속성별 긍정·부정 비율, 자주 언급된 속성, 건별 분석 결과를 조회했습니다. 하나의 리뷰에 여러 속성이 포함되므로 감성 비율의 분모는 리뷰 수가 아닌 속성별 판정 수입니다.
 
-단순 재실행이 아니라  
-오류 원인에 맞는 수정 지시를 생성합니다.
+## 파일과 실행 방법
 
-### Example
+| 파일 | 용도 |
+| --- | --- |
+| `Review Analysis System.ipynb` | 기존 작업 노트북. 키 출력과 저장된 실행 출력만 정리 |
+| `review_agent.ipynb` | 실행 및 검토에 사용할 노트북 |
+| `app.py` | Streamlit 결과 조회 화면 |
+| `test_review_agent.py` | API 호출 없이 실행하는 회귀 테스트 |
+| `VALIDATION.md` | 코드 수정과 확인 범위 |
+| `review-agent-implementation.pdf` | 처리 흐름·역할·판단 기준 요약 |
 
-```python
-"EVIDENCE_ERROR":
-"evidence는 리뷰 원문에 실제로 있는 연속된 문구만 사용하라."
-```
+### 분석 실행
 
-이를 기반으로 Analyzer가 수정된 분석을 다시 수행합니다.
-
----
-
-## 5️⃣ Supervisor 기반 Workflow 제어
-
-Supervisor Agent가 전체 흐름을 제어합니다.
-
-### 역할
-
-- 다음 Agent 결정
-- 재시도 여부 판단
-- Human Review 여부 판단
-- 최종 종료 제어
-
-즉, 전체 Multi-Agent 시스템의 오케스트레이터 역할을 수행합니다.
-
----
-
-## 6️⃣ Human-in-the-Loop(HITL)
-
-본 프로젝트의 핵심 기능입니다.
-
-LLM이 다음 상황에 도달하면 사람이 직접 개입합니다.
-
-### Human Review 조건
-
-- 반복 재시도 실패
-- 감정 판단이 애매한 경우
-- 품질 신뢰성이 낮은 경우
-
-### Example
-
-```python
-if retry_count >= 2:
-    return True
-```
-
-```python
-HUMAN_REQUIRED = {
-    "QUALITY_ERROR",
-    "ETC"
-}
-```
-
----
-
-## 7️⃣ Human Review 시스템
-
-Human Reviewer는 다음 정보를 확인할 수 있습니다.
-
-- 리뷰 원문
-- 기존 분석 결과
-- Critic 평가 결과
-- 수정 가이드
-
-이후 사람이 직접 최종 JSON 결과를 수정 및 승인합니다.
-
----
-
-# 🧠 Agent Workflow 구조
+`review_agent.ipynb`를 Colab에서 열고 필요한 환경 설정 및 Agent 정의 셀을 실행합니다. API 키는 환경변수 또는 개인 `api_key.txt`에 설정하며 공개 저장소에 올리지 않습니다.
 
 ```text
-User Review Input
-        ↓
-Analyzer Agent
-(감성 분석)
-        ↓
-Critic Agent
-(품질 검증)
-        ↓
-Supervisor Agent
-(흐름 제어)
-   ├─ 정상 → 종료
-   ├─ 오류 → 재시도
-   └─ 위험/애매 → Human Review(HITL)
+OPENAI_API_KEY=본인의키
 ```
 
----
+- 단건 예제와 배치 실행 셀은 OpenAI API를 호출하므로 선택해서 실행합니다. 전체 셀 반복 실행은 피하세요.
+- LangSmith 전송은 기본 비활성화입니다. 평가가 필요할 때 별도 키·데이터셋과 전송 범위를 확인하고 활성화합니다.
+- 배치는 `review` 컬럼이 있는 `data.csv`를 입력으로 사용하고, 원본 대신 `review_results.csv`에서 진행합니다. 원본 리뷰 데이터·LangSmith 평가 데이터셋은 저장소에 포함되어 있지 않습니다.
+- 사람 검토가 필요한 배치 결과는 `needs_review`로 남습니다. 해당 리뷰를 단건 검토한 뒤 저장하는 별도 처리 과정이 필요합니다.
 
-# ⚙️ 기술 스택
-
-## 🔹 AI / LLM
-
-- OpenAI GPT
-- Prompt Engineering
-
-### 역할
-
-- 리뷰 감성 분석
-- 품질 검증
-- 오류 분석
-- 수정 지시 생성
-
----
-
-## 🔹 Agent Workflow
-
-- LangGraph
-- LangChain
-
-### 역할
-
-- Multi-Agent Workflow 구성
-- 상태(State) 관리
-- Conditional Routing
-- Supervisor 기반 흐름 제어
-
----
-
-## 🔹 Data Processing
-
-- Python
-- TypedDict
-- JSON Parsing
-
-### 역할
-
-- 리뷰 데이터 처리
-- 구조화된 출력 생성
-- Batch Processing
-
----
-
-## 🔹 HITL(Human-in-the-Loop)
-
-### 역할
-
-- 품질 불확실성 보완
-- Human 승인 프로세스
-- 최종 결과 검수
-
----
-
-# 📂 프로젝트 구조
+### 대시보드와 테스트
 
 ```bash
-AI-Multi-Agent-Review-System/
-│
-├── data/
-├── outputs/
-├── reviews/
-│
-├── analyzer.py
-├── critic.py
-├── supervisor.py
-├── human_node.py
-├── workflow.py
-├── app.py
-├── utils.py
-├── requirements.txt
-│
-└── README.md
+python -m pip install -r requirements.txt
+streamlit run app.py
 ```
 
----
-
-# 🖥️ 실행 방법
-
-## 1️⃣ 저장소 클론
+`review_results.csv`가 없으면 준비 안내가 표시됩니다. `demo_results.csv`는 화면 확인용으로 직접 작성한 가상 리뷰 3건이며, 모델 성능이나 실제 고객 데이터를 나타내지 않습니다. API 호출 없이 다음 명령으로 조회할 수 있습니다.
 
 ```bash
-git clone https://github.com/your-github-id/AI-Multi-Agent-Review-System.git
+streamlit run app.py -- --data demo_results.csv
 ```
-
----
-
-## 2️⃣ 패키지 설치
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements-test.txt
+python -m pytest test_review_agent.py -q
 ```
 
----
+## 한계와 다음 개선
 
-## 3️⃣ API KEY 설정
+- 허용 속성은 프롬프트에 이미 제시되어 있습니다. 다음 개선은 후보를 새로 정하는 것보다 혼합 감성·무관한 리뷰의 판정 기준과 적용 일관성을 높이는 데 있습니다.
+- Critic 검토와 형식 검사는 의미적으로 올바른 감성 판단을 보장하지 않습니다. 정답 라벨 평가와 사람 검토 비율 측정이 필요합니다.
+- HITL은 콘솔 방식입니다. 웹 검수 화면과 보류 결과 재개·저장 흐름은 후속 과제입니다.
+- 실제 기업 운영, 검수 시간 절감과 고객 만족도 변화는 측정한 성과가 아닙니다.
 
-```python
-OPENAI_API_KEY=YOUR_API_KEY
-```
+## 자료
 
----
+- [팀 결과보고서](https://drive.google.com/file/d/12zsNLxls7zo_7dN0Lh0NKxm_2IxEjCSR/view)
+- [구현 설명 PDF](review-agent-implementation.pdf)
+- [노션 포트폴리오](https://app.notion.com/p/3617a7a87a17805d8905dae783095310)
 
-## 4️⃣ 실행
+팀원: 김남효, 박병린, 김도훈, 이승호, 박주영, 김민성, 강혜원, 이채은
 
-```bash
-python app.py
-```
-
----
-
-# 📸 프로젝트 결과 예시
-
-## 입력
-
-```text
-배송은 느렸지만 제품 품질은 좋아요.
-```
-
----
-
-## 출력
-
-```json
-{
-  "items": [
-    {
-      "aspect": "배송",
-      "label": 0,
-      "evidence": "배송은 느렸지만"
-    },
-    {
-      "aspect": "품질",
-      "label": 1,
-      "evidence": "제품 품질은 좋아요"
-    }
-  ]
-}
-```
-
----
-
-# 💡 프로젝트 특징
-
-## ✅ Multi-Agent 기반 품질 검증 시스템
-
-단순 감성 분석 모델이 아니라:
-
-- 감성 분석
-- 품질 검증
-- 오류 분석
-- Human 승인
-
-까지 포함한 AI Workflow 시스템입니다.
-
----
-
-## ✅ Supervisor 기반 Orchestration
-
-- Node 기반 Workflow
-- 상태(State) 관리
-- Agent 흐름 제어
-- 정책 기반 Retry
-
-구조를 적용했습니다.
-
----
-
-## ✅ Human-in-the-Loop(HITL)
-
-AI가 해결하기 어려운 상황에서  
-사람이 직접 최종 품질 검수를 수행합니다.
-
-이를 통해:
-
-- 신뢰성 향상
-- Hallucination 감소
-- 실제 서비스 적용 가능성 강화
-
-를 구현하였습니다.
-
----
-
-# 📈 기대 효과
-
-## AI 서비스 품질 향상
-
-- 리뷰 분석 자동화
-- 품질 검증 자동화
-- Human 검수 비용 절감
-- 신뢰성 높은 LLM 시스템 구축
-- 실제 서비스 적용 가능성 강화
-
----
-
-# 🧩 향후 개선 방향
-
-- Streamlit 기반 Dashboard 구축
-- Vector DB 연동
-- RAG 기반 Evidence 검증
-- 다국어 리뷰 분석
-- 실시간 Human Approval 시스템
-- Fine-Tuning 적용
-- 관리자 검수 UI 구축
-
----
-
-# 🎯 프로젝트 핵심 가치
-
-```text
-리뷰 데이터를 입력받아
-AI가 감성 분석을 수행하고,
-Critic 검증과 Human Review까지 자동 처리하는
-생성형 AI 기반 Multi-Agent 품질 검증 시스템
-```
-
----
-
-# 👨‍💻 Contributors
-
-- 김남효,박병린,김도훈,이승호,박주영,김민성,강혜원,이채은
-- Team Project
-
----
-
-# 📜 License
+## License
 
 This project is licensed under the MIT License.

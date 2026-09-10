@@ -1,0 +1,4 @@
+pytest
+pandas
+langgraph
+langchain-core
