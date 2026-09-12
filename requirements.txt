@@ -1,0 +1,9 @@
+langchain-openai
+langchain-community
+langgraph
+langsmith
+streamlit
+pandas
+numpy
+matplotlib
+seaborn

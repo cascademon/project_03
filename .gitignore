@@ -1,0 +1,8 @@
+api_key.txt
+.env
+.secrets/
+__pycache__/
+.pytest_cache/
+data.csv
+review_results.csv
+*.log
